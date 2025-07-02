@@ -1,0 +1,17 @@
+openapi: 3.0.3
+info: 
+  title: OrderService API 
+  version: 1.0.0
+  description: API для работы с данными о заказах
+x-ogen:
+  target: ./pkg/openapi/order/v1
+  package: order_v1
+  clean: true 
+
+tags:
+  - name: Weather 
+    description: Операции с данными о заказах - получение и изменение информации 
+
+paths:
+  /api/v1/orders:
+    $ref: ./paths/orders.yaml

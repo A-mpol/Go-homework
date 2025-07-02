@@ -1,0 +1,11 @@
+post:
+  summary: Creates a new order based on the details selected by the user
+  operationId: PostOrders
+  tags:
+    - Order 
+  requestBody:
+    required: true 
+    content:
+      application/json:
+        schema:
+          $ref: ../components/create_order_request.yaml 
