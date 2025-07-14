@@ -4,7 +4,7 @@ package inventory.v1;
 
 import "google/protobuf/timestamp.proto"; 
 
-option go_package = "github.com/A-mpol/Go-homework/grpc/proto/inventory/v1;inventory_v1";
+option go_package = "github.com/A-mpol/Go-homework/shared/proto/inventory/v1;inventory_v1";
 
 service InventoryService {
     rpc GetPart(GetPartRequest) returns (GetPartResponse);
@@ -34,11 +34,11 @@ message Value {
 }
 
 enum Category {
-    UNKNOWN = 0;
-    ENGINE = 1;
-    FUEL = 2;
-    PORTHOLE = 3;
-    WING = 4;
+    CATEGORY_UNKNOWN_UNSPECIFIED = 0;
+    CATEGORY_ENGINE = 1;
+    CATEGORY_FUEL = 2;
+    CATEGORY_PORTHOLE = 3;
+    CATEGORY_WING = 4;
 }
 
 message Part {
