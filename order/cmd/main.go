@@ -27,9 +27,9 @@ import (
 )
 
 const (
-	grpcPort               = 50051
-	httpPort               = 8081
-	inventoryServerAddress = "localhost:50052"
+	grpcPort               = 50052
+	httpPort               = 8080
+	inventoryServerAddress = "localhost:50051"
 	paymentServerAddress   = "localhost:50053"
 	orderServerAddress     = "localhost:50054"
 )

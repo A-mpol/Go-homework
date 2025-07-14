@@ -19,7 +19,7 @@ import (
 	"google.golang.org/grpc/status"
 )
 
-const grpcPort = 50052
+const grpcPort = 50051
 
 type inventoryService struct {
 	inventory_v1.UnimplementedInventoryServiceServer
