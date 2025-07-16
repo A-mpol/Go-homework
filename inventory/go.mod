@@ -3,13 +3,13 @@ module inventory
 go 1.24.2
 
 require (
+	github.com/brianvoe/gofakeit v3.18.0+incompatible
+	github.com/google/uuid v1.6.0
 	google.golang.org/grpc v1.73.0
 	shared v0.0.0
 )
 
 require (
-	github.com/brianvoe/gofakeit v3.18.0+incompatible // indirect
-	github.com/google/uuid v1.6.0 // indirect
 	golang.org/x/net v0.42.0 // indirect
 	golang.org/x/sys v0.34.0 // indirect
 	golang.org/x/text v0.27.0 // indirect

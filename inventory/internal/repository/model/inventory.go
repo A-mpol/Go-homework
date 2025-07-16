@@ -2,26 +2,38 @@ package model
 
 import "time"
 
+type GetPartRequest struct {
+	Uuid string
+}
+
+type GetPartResponse struct {
+	Part Part
+}
+
+type ListPartsRequest struct {
+	Filter PartsFilter
+}
+
+type ListPartsResponse struct {
+	Parts []Part
+}
+
 type Part struct {
 	Uuid          string
 	Name          string
-	Description   *string
+	Description   string
 	Price         float64
-	StockQuantity *int64
-	Category      *Category
-	Dimensions    *Dimensions
-	Manufacturer  *Manufacturer
+	StockQuantity int64
+	Category      Category
+	Dimensions    Dimensions
+	Manufacturer  Manufacturer
 	Tags          []string
-	Metadata      map[string]*Value
-	CreatedAt     *time.Time
-	UpdatedAt     *time.Time
+	Metadata      map[string]Value
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
 }
 
-type ListParts struct {
-	Parts []*Part
-}
-
-type Filters struct {
+type PartsFilter struct {
 	Uuids                 []string
 	Names                 []string
 	Categories            []Category

@@ -1,65 +1,86 @@
 package converter
 
 import (
-	"inventory/internal/model"
+	serviceModel "inventory/internal/model"
 	repoModel "inventory/internal/repository/model"
 )
 
-func FiltersToRepoFilters(serviceFilters *model.Filters) *repoModel.Filters {
-	var repoCategories []repoModel.Category
-	for _, c := range serviceFilters.Categories {
-		repoCategories = append(repoCategories, repoModel.Category(c))
-	}
-
-	return &repoModel.Filters{
-		Uuids:                 serviceFilters.Uuids,
-		Names:                 serviceFilters.Names,
-		Categories:            repoCategories,
-		ManufacturerCountries: serviceFilters.ManufacturerCountries,
-		Tags:                  serviceFilters.Tags,
+func ServiceGetPartRequestToRepo(serviceModelGetPartRequest serviceModel.GetPartRequest) repoModel.GetPartRequest {
+	return repoModel.GetPartRequest{
+		Uuid: serviceModelGetPartRequest.Uuid,
 	}
 }
 
-func PartToModel(part *repoModel.Part) *model.Part {
-	serviceMetadata := make(map[string]*model.Value, len(part.Metadata))
-	for k, v := range part.Metadata {
-		if v != nil {
-			serviceMetadata[k] = &model.Value{
-				StringValue: v.StringValue,
-				Int64Value:  v.Int64Value,
-				DoubleValue: v.DoubleValue,
-				BoolValue:   v.BoolValue,
-			}
-		} else {
-			serviceMetadata[k] = nil
-		}
-	}
-	return &model.Part{
-		Uuid:          part.Uuid,
-		Name:          part.Name,
-		Description:   part.Description,
-		Price:         part.Price,
-		StockQuantity: part.StockQuantity,
-		Category:      (*model.Category)(part.Category),
-		Dimensions:    (*model.Dimensions)(part.Dimensions),
-		Manufacturer:  (*model.Manufacturer)(part.Manufacturer),
-		Tags:          part.Tags,
-		Metadata:      serviceMetadata,
-		CreatedAt:     part.CreatedAt,
-		UpdatedAt:     part.UpdatedAt,
+func RepoGetPartResponseToService(repoModelGetPartResponse repoModel.GetPartResponse) serviceModel.GetPartResponse {
+	return serviceModel.GetPartResponse{
+		Part: RepoPartToService(repoModelGetPartResponse.Part),
 	}
 }
 
-func ListPartsToModel(listParts *repoModel.ListParts) *model.ListParts {
-	serviceParts := make([]*model.Part, 0, len(listParts.Parts))
-	for _, p := range listParts.Parts {
-		if p == nil {
-			serviceParts = append(serviceParts, nil)
-		} else {
-			serviceParts = append(serviceParts, PartToModel(p))
-		}
+func RepoPartToService(repoModelPart repoModel.Part) serviceModel.Part {
+	return serviceModel.Part{
+		Uuid:          repoModelPart.Uuid,
+		Name:          repoModelPart.Name,
+		Description:   repoModelPart.Description,
+		Price:         repoModelPart.Price,
+		StockQuantity: repoModelPart.StockQuantity,
+		Category:      serviceModel.Category(repoModelPart.Category),
+		Dimensions:    serviceModel.Dimensions(repoModelPart.Dimensions),
+		Manufacturer:  serviceModel.Manufacturer(repoModelPart.Manufacturer),
+		Tags:          repoModelPart.Tags,
+		Metadata:      RepoMetadataToService(repoModelPart.Metadata),
+		CreatedAt:     repoModelPart.CreatedAt,
+		UpdatedAt:     repoModelPart.UpdatedAt,
 	}
-	return &model.ListParts{
-		Parts: serviceParts,
+}
+
+func RepoValueToService(v repoModel.Value) serviceModel.Value {
+	return serviceModel.Value{
+		StringValue: v.StringValue,
+		Int64Value:  v.Int64Value,
+		DoubleValue: v.DoubleValue,
+		BoolValue:   v.BoolValue,
 	}
+}
+
+func RepoMetadataToService(src map[string]repoModel.Value) map[string]serviceModel.Value {
+	dst := make(map[string]serviceModel.Value, len(src))
+	for k, v := range src {
+		dst[k] = RepoValueToService(v)
+	}
+	return dst
+}
+
+func ServiceListPartsRequestToRepo(serviceModelListPartsRequest serviceModel.ListPartsRequest) repoModel.ListPartsRequest {
+	return repoModel.ListPartsRequest{
+		Filter: repoModel.PartsFilter{
+			Uuids:                 serviceModelListPartsRequest.Filter.Uuids,
+			Names:                 serviceModelListPartsRequest.Filter.Names,
+			Categories:            ServiceCategoriesToRepo(serviceModelListPartsRequest.Filter.Categories),
+			ManufacturerCountries: serviceModelListPartsRequest.Filter.ManufacturerCountries,
+			Tags:                  serviceModelListPartsRequest.Filter.Tags,
+		},
+	}
+}
+
+func ServiceCategoriesToRepo(src []serviceModel.Category) []repoModel.Category {
+	dst := make([]repoModel.Category, len(src))
+	for i, cat := range src {
+		dst[i] = repoModel.Category(cat)
+	}
+	return dst
+}
+
+func RepoListPartsResponseToService(repoModelListPartsResponse repoModel.ListPartsResponse) serviceModel.ListPartsResponse {
+	return serviceModel.ListPartsResponse{
+		Parts: RepoPartsToService(repoModelListPartsResponse.Parts),
+	}
+}
+
+func RepoPartsToService(src []repoModel.Part) []serviceModel.Part {
+	dst := make([]serviceModel.Part, len(src))
+	for i, item := range src {
+		dst[i] = RepoPartToService(item)
+	}
+	return dst
 }
