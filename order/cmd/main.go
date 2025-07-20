@@ -6,24 +6,21 @@ import (
 	"log"
 	"net"
 	"net/http"
+	orderApi "order/internal/api/order/v1"
+	orderRepository "order/internal/repository/order"
+	orderService "order/internal/service/order"
 	"os"
 	"os/signal"
 	inventory_v1 "shared/pkg/proto/inventory/v1"
 	order_v1 "shared/pkg/proto/order/v1"
 	payment_v1 "shared/pkg/proto/payment/v1"
-	"sync"
 	"syscall"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
 	"google.golang.org/grpc"
-	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/reflection"
-	"google.golang.org/grpc/status"
-	"google.golang.org/protobuf/types/known/emptypb"
-	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 const (
@@ -33,122 +30,6 @@ const (
 	paymentServerAddress   = "localhost:50053"
 	orderServerAddress     = "localhost:50054"
 )
-
-type orderService struct {
-	order_v1.UnimplementedOrderServiceServer
-
-	mu     sync.RWMutex
-	orders map[string]*order_v1.Order
-
-	inventoryClient inventory_v1.InventoryServiceClient
-	paymentClient   payment_v1.PaymentServiceClient
-}
-
-func NewOrderService(
-	inventoryClient inventory_v1.InventoryServiceClient,
-	paymentClient payment_v1.PaymentServiceClient,
-) *orderService {
-	return &orderService{
-		orders:          make(map[string]*order_v1.Order),
-		inventoryClient: inventoryClient,
-		paymentClient:   paymentClient,
-	}
-}
-
-func (o *orderService) Create(ctx context.Context, in *order_v1.CreateRequest) (*order_v1.CreateResponse, error) {
-	listParts, err := o.inventoryClient.ListParts(ctx, &inventory_v1.ListPartsRequest{
-		Filter: &inventory_v1.PartsFilter{
-			Uuids: in.GetPartUuids(),
-		}})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Don't get list parts")
-	}
-	if len(listParts.Parts) < len(in.GetPartUuids()) {
-		return nil, status.Errorf(codes.Internal, "Not all details exist")
-	}
-
-	var totalPrice float64
-	for _, part := range listParts.Parts {
-		totalPrice += part.Price
-	}
-
-	orderUuid := uuid.NewString()
-
-	o.mu.Lock()
-	o.orders[orderUuid] = &order_v1.Order{
-		OrderUuid:  orderUuid,
-		UserUuid:   in.GetUserUuid(),
-		PartUuids:  in.GetPartUuids(),
-		TotalPrice: totalPrice,
-		Status:     order_v1.Status_STATUS_PENDING_PAYMENT,
-	}
-	o.mu.Unlock()
-
-	return &order_v1.CreateResponse{
-		OrderUuid:  orderUuid,
-		TotalPrice: totalPrice,
-	}, nil
-}
-
-func (o *orderService) Pay(ctx context.Context, in *order_v1.PayRequest) (*order_v1.PayResponse, error) {
-	o.mu.RLock()
-	order, ok := o.orders[in.GetOrderUuid()]
-	o.mu.RUnlock()
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "Order not found")
-	}
-
-	paymentInformation, err := o.paymentClient.PayOrder(ctx, &payment_v1.PayOrderRequest{
-		OrderUuid:     in.GetOrderUuid(),
-		UserUuid:      order.UserUuid,
-		PaymentMethod: payment_v1.PaymentMethod(in.GetPaymentMethod()),
-	})
-	if err != nil {
-		return nil, status.Errorf(codes.Internal, "Failed to pay")
-	}
-
-	o.mu.Lock()
-	o.orders[in.GetOrderUuid()].TransactionUuid = &wrapperspb.StringValue{Value: paymentInformation.TransactionUuid}
-	o.orders[in.GetOrderUuid()].PaymentMethod = in.GetPaymentMethod()
-	o.orders[in.GetOrderUuid()].Status = order_v1.Status_STATUS_PAID
-	o.mu.Unlock()
-
-	return &order_v1.PayResponse{
-		TransactionUuid: paymentInformation.TransactionUuid,
-	}, nil
-}
-
-func (o *orderService) Get(ctx context.Context, in *order_v1.GetRequest) (*order_v1.GetResponse, error) {
-	o.mu.RLock()
-	order, ok := o.orders[in.GetOrderUuid()]
-	o.mu.RUnlock()
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "Order not found")
-	}
-
-	return &order_v1.GetResponse{
-		Order: order,
-	}, nil
-}
-
-func (o *orderService) Cancel(ctx context.Context, in *order_v1.CancelRequest) (*emptypb.Empty, error) {
-	o.mu.RLock()
-	order, ok := o.orders[in.GetOrderUuid()]
-	o.mu.RUnlock()
-	if !ok {
-		return nil, status.Errorf(codes.NotFound, "Order not found")
-	}
-
-	if order.Status == order_v1.Status_STATUS_PAID {
-		return nil, status.Errorf(codes.AlreadyExists, "Order already paid, cannot cancel")
-	}
-
-	o.mu.Lock()
-	o.orders[in.GetOrderUuid()].Status = order_v1.Status_STATUS_CANCELLED
-	o.mu.Unlock()
-
-	return &emptypb.Empty{}, nil
-}
 
 func main() {
 	// Запускаем gRPC сервер
@@ -189,13 +70,16 @@ func main() {
 
 	_ = order_v1.NewOrderServiceClient(orderConn)
 
-	service := NewOrderService(
+	repo := orderRepository.NewRepository()
+	service := orderService.NewService(
+		repo,
 		inventory_v1.NewInventoryServiceClient(inventoryConn),
 		payment_v1.NewPaymentServiceClient(paymentConn),
 	)
+	api := orderApi.NewApi(service)
 
 	s := grpc.NewServer()
-	order_v1.RegisterOrderServiceServer(s, service)
+	order_v1.RegisterOrderServiceServer(s, api)
 	reflection.Register(s)
 
 	// Запускаем gRPC сервер в горутине
